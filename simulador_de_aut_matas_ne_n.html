@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutomatonSimulador - Estética Sky & Breeze</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        skyTheme: {
+                            buttercup: '#FFF2B2',
+                            dewyBlue: '#A8C6E7',
+                            sunwashed: '#FFE08A',
+                            cloudPuff: '#FFF7D6',
+                            morningBreeze: '#7FA8D6',
+                            bg: '#F5F8FC',
+                            card: '#FFFFFF',
+                            cardBorder: '#E2EAF4',
+                            textDark: '#2C3E50',
+                            textMuted: '#64748B',
+                            accentBlue: '#4A739C'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #F5F8FC;
+            color: #2C3E50;
+            overflow-x: hidden;
+        }
+
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Subtle Soft Glows & Shadows */
+        .soft-shadow {
+            box-shadow: 0 10px 25px -5px rgba(127, 168, 214, 0.15), 0 8px 10px -6px rgba(127, 168, 214, 0.1);
+        }
+
+        .glow-yellow {
+            box-shadow: 0 0 18px rgba(255, 224, 138, 0.7);
+        }
+
+        .glow-blue {
+            box-shadow: 0 0 18px rgba(168, 198, 231, 0.7);
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F1F5F9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #A8C6E7;
+            border-radius: 99px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #7FA8D6;
+        }
+
+        /* Delicate grid background */
+        .bg-sky-grid {
+            background-image: linear-gradient(to right, rgba(168, 198, 231, 0.15) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(168, 198, 231, 0.15) 1px, transparent 1px);
+            background-size: 28px 28px;
+        }
+
+        /* Glassmorphism Soft Cards */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 234, 244, 0.9);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col bg-skyTheme-bg bg-sky-grid select-none overflow-hidden">
+
+    <!-- HEADER / NAVBAR -->
+    <header class="h-16 border-b border-skyTheme-cardBorder bg-white/90 backdrop-blur px-6 flex items-center justify-between z-20 shadow-sm">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-skyTheme-buttercup border border-skyTheme-sunwashed flex items-center justify-center text-skyTheme-textDark shadow-sm">
+                <i class="fa-solid fa-cloud-sun text-lg text-skyTheme-accentBlue"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-extrabold text-skyTheme-textDark tracking-wide flex items-center gap-2">
+                    AUTOMATON<span class="text-skyTheme-accentBlue">SIMULATOR</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full border border-skyTheme-dewyBlue bg-skyTheme-cloudPuff text-skyTheme-textDark code-font font-bold">Buttercup Sky</span>
+                </h1>
+            </div>
+        </div>
+
+        <!-- Action Controls Header -->
+        <div class="flex items-center space-x-2">
+            <button onclick="loadPreset('endsWith01')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-skyTheme-cloudPuff hover:bg-skyTheme-buttercup text-skyTheme-textDark border border-skyTheme-sunwashed/60 transition flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-sparkles text-amber-500"></i> Ej: Termina '01'
+            </button>
+            <button onclick="loadPreset('evenA')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-skyTheme-bg hover:bg-skyTheme-dewyBlue/30 text-skyTheme-textDark border border-skyTheme-cardBorder transition flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-wand-magic-sparkles text-skyTheme-accentBlue"></i> Ej: 'a's Pares
+            </button>
+            <button onclick="loadPreset('nfaExample')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-skyTheme-bg hover:bg-skyTheme-dewyBlue/30 text-skyTheme-textDark border border-skyTheme-cardBorder transition flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-diagram-nested text-skyTheme-morningBreeze"></i> NFA: Contiene '11'
+            </button>
+            <div class="h-5 w-px bg-slate-200 mx-1"></div>
+            <button onclick="toggleMavenModal()" class="px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-skyTheme-dewyBlue/40 hover:bg-skyTheme-dewyBlue text-skyTheme-textDark border border-skyTheme-morningBreeze/40 transition flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-folder-tree text-skyTheme-accentBlue"></i> ESTRUCTURA MAVEN
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE CONTAINER -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- LEFT PANEL: TOOLBOX & DESIGNER -->
+        <aside class="w-80 border-r border-skyTheme-cardBorder bg-white/70 backdrop-blur flex flex-col z-10">
+            <!-- Mode Switch Tabs -->
+            <div class="flex border-b border-skyTheme-cardBorder bg-skyTheme-bg p-1.5 gap-1 text-xs font-semibold">
+                <button id="tabDesign" onclick="setLeftTab('design')" class="flex-1 py-1.5 rounded-md text-center bg-white text-skyTheme-textDark shadow-sm border border-skyTheme-cardBorder">
+                    <i class="fa-solid fa-pen-ruler mr-1.5 text-skyTheme-accentBlue"></i> Diseñador
+                </button>
+                <button id="tabMatrix" onclick="setLeftTab('matrix')" class="flex-1 py-1.5 rounded-md text-center text-skyTheme-textMuted hover:text-skyTheme-textDark hover:bg-white/50 transition">
+                    <i class="fa-solid fa-table-cells mr-1.5 text-skyTheme-morningBreeze"></i> Transiciones
+                </button>
+            </div>
+
+            <!-- TAB 1: DESIGNER CONTROLS -->
+            <div id="contentDesign" class="p-4 flex-1 overflow-y-auto space-y-5">
+                <!-- Interactive Mode Selector -->
+                <div>
+                    <label class="text-[11px] font-bold uppercase text-skyTheme-textMuted tracking-wider block mb-2">Herramienta Activa</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="toolSelect" onclick="setTool('select')" class="p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition bg-skyTheme-buttercup border-skyTheme-sunwashed text-skyTheme-textDark shadow-sm">
+                            <i class="fa-solid fa-hand-pointer text-skyTheme-accentBlue"></i> Mover
+                        </button>
+                        <button id="toolAddNode" onclick="setTool('addNode')" class="p-2.5 rounded-xl border border-skyTheme-cardBorder bg-white hover:bg-skyTheme-cloudPuff text-xs font-semibold flex items-center gap-2 transition text-skyTheme-textDark shadow-sm">
+                            <i class="fa-solid fa-circle-plus text-amber-500"></i> + Estado
+                        </button>
+                        <button id="toolAddEdge" onclick="setTool('addEdge')" class="p-2.5 rounded-xl border border-skyTheme-cardBorder bg-white hover:bg-skyTheme-cloudPuff text-xs font-semibold flex items-center gap-2 transition text-skyTheme-textDark shadow-sm">
+                            <i class="fa-solid fa-arrow-right-long text-skyTheme-accentBlue"></i> + Transición
+                        </button>
+                        <button id="toolDelete" onclick="setTool('delete')" class="p-2.5 rounded-xl border border-skyTheme-cardBorder bg-white hover:bg-rose-50 text-xs font-semibold flex items-center gap-2 transition text-rose-600 shadow-sm">
+                            <i class="fa-solid fa-trash text-rose-400"></i> Eliminar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Selected Element Inspector -->
+                <div class="p-4 rounded-xl bg-skyTheme-cloudPuff/60 border border-skyTheme-sunwashed/60 space-y-3 soft-shadow">
+                    <div class="flex justify-between items-center border-b border-skyTheme-sunwashed/50 pb-2">
+                        <span class="text-[11px] font-extrabold text-skyTheme-textDark uppercase tracking-wider">Propiedades</span>
+                        <span id="selectedElemType" class="text-[10px] code-font px-2 py-0.5 rounded-full bg-white text-skyTheme-textMuted border border-skyTheme-cardBorder">Ninguno</span>
+                    </div>
+
+                    <div id="inspectorContent" class="text-xs text-skyTheme-textMuted italic py-2 text-center">
+                        Haz clic en un estado o transición para editar sus parámetros.
+                    </div>
+                </div>
+
+                <!-- Quick Canvas Operations -->
+                <div class="space-y-2">
+                    <label class="text-[11px] font-bold uppercase text-skyTheme-textMuted tracking-wider block">Acciones Rápida</label>
+                    <div class="flex gap-2">
+                        <button onclick="clearCanvas()" class="flex-1 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold transition shadow-sm">
+                            <i class="fa-solid fa-broom mr-1"></i> Limpiar Todo
+                        </button>
+                        <button onclick="autoLayout()" class="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-skyTheme-bg border border-skyTheme-cardBorder text-skyTheme-textDark text-xs font-semibold transition shadow-sm">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1 text-skyTheme-accentBlue"></i> Alinear
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: TRANSITION TABLE -->
+            <div id="contentMatrix" class="p-4 flex-1 overflow-y-auto hidden">
+                <h3 class="text-[11px] font-bold uppercase text-skyTheme-textMuted tracking-wider mb-3">Tabla de Transiciones δ(q, σ)</h3>
+                <div id="matrixContainer" class="overflow-x-auto rounded-xl border border-skyTheme-cardBorder bg-white shadow-sm">
+                    <!-- Dynamic Matrix Rendered by JS -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTER CANVAS: AUTOMATON VIEWPORT -->
+        <main class="flex-1 relative bg-skyTheme-bg flex flex-col">
+            <!-- Canvas HUD Overlay Header -->
+            <div class="absolute top-4 left-5 z-10 flex items-center gap-3 bg-white/90 backdrop-blur px-4 py-2 rounded-xl border border-skyTheme-cardBorder text-xs shadow-sm">
+                <span class="flex items-center gap-2 text-skyTheme-textDark font-semibold">
+                    <span class="w-2.5 h-2.5 rounded-full bg-skyTheme-morningBreeze animate-pulse"></span>
+                    Estado: <span id="automatonTypeTag" class="text-skyTheme-accentBlue code-font font-bold">DFA Válido</span>
+                </span>
+                <span class="text-slate-300">|</span>
+                <span class="text-skyTheme-textMuted">Estados: <b id="statNodesCount" class="text-skyTheme-textDark">0</b></span>
+                <span class="text-slate-300">|</span>
+                <span class="text-skyTheme-textMuted">Transiciones: <b id="statEdgesCount" class="text-skyTheme-textDark">0</b></span>
+            </div>
+
+            <!-- Interactive Canvas -->
+            <div class="flex-1 relative cursor-crosshair overflow-hidden" id="canvasContainer">
+                <canvas id="automatonCanvas" class="w-full h-full block"></canvas>
+            </div>
+
+            <!-- BOTTOM SIMULATION & EXECUTION BAR -->
+            <div class="border-t border-skyTheme-cardBorder bg-white/90 backdrop-blur p-4 space-y-3 z-10 shadow-lg">
+                <!-- String Input & Action Controls -->
+                <div class="flex flex-col md:flex-row items-center gap-3">
+                    <div class="relative flex-1 w-full">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-skyTheme-textMuted code-font text-xs font-bold">
+                            Σ*
+                        </span>
+                        <input type="text" id="inputTapeString" value="01001" placeholder="Ej: 01011"
+                            class="w-full pl-9 pr-28 py-2.5 bg-skyTheme-bg border border-skyTheme-cardBorder rounded-xl text-skyTheme-textDark code-font text-sm font-bold tracking-widest focus:outline-none focus:border-skyTheme-morningBreeze transition shadow-inner">
+                        <span id="validationBadge" class="absolute inset-y-1.5 right-2 px-2.5 flex items-center text-[10px] font-bold rounded-lg bg-skyTheme-cloudPuff text-skyTheme-textDark border border-skyTheme-sunwashed">
+                            LISTO
+                        </span>
+                    </div>
+
+                    <!-- Step Controls Group -->
+                    <div class="flex items-center gap-2 w-full md:w-auto">
+                        <button onclick="resetSimulation()" title="Reiniciar" class="p-2.5 rounded-xl bg-white hover:bg-skyTheme-bg border border-skyTheme-cardBorder text-skyTheme-textDark transition shadow-sm">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                        <button id="btnStep" onclick="stepSimulation()" class="px-4 py-2.5 rounded-xl bg-skyTheme-dewyBlue hover:bg-skyTheme-morningBreeze border border-skyTheme-morningBreeze/50 text-skyTheme-textDark text-xs font-bold flex items-center gap-2 transition shadow-sm">
+                            <i class="fa-solid fa-step-forward"></i> Paso
+                        </button>
+                        <button id="btnPlay" onclick="toggleAutoPlay()" class="px-5 py-2.5 rounded-xl bg-skyTheme-buttercup hover:bg-skyTheme-sunwashed border border-skyTheme-sunwashed text-skyTheme-textDark text-xs font-extrabold flex items-center gap-2 transition shadow-sm glow-yellow">
+                            <i id="playIcon" class="fa-solid fa-play"></i> Auto
+                        </button>
+                        <button onclick="instantTest()" class="px-4 py-2.5 rounded-xl bg-skyTheme-cloudPuff hover:bg-skyTheme-buttercup border border-skyTheme-sunwashed text-skyTheme-textDark text-xs font-bold flex items-center gap-2 transition shadow-sm">
+                            <i class="fa-solid fa-bolt text-amber-500"></i> Evaluar
+                        </button>
+                    </div>
+
+                    <!-- Speed Slider Control -->
+                    <div class="flex items-center gap-2 px-3 py-2 bg-skyTheme-bg border border-skyTheme-cardBorder rounded-xl text-xs text-skyTheme-textMuted w-full md:w-48 shadow-inner">
+                        <i class="fa-solid fa-gauge-high text-skyTheme-accentBlue"></i>
+                        <input type="range" id="speedSlider" min="200" max="2000" step="100" value="800" class="w-full accent-skyTheme-accentBlue cursor-pointer">
+                        <span id="speedLabel" class="code-font text-[10px] font-bold">800ms</span>
+                    </div>
+                </div>
+
+                <!-- TAPE & STATUS READOUT -->
+                <div class="flex flex-col md:flex-row items-center justify-between gap-3 pt-1">
+                    <!-- Reading Tape Visualizer -->
+                    <div class="flex items-center gap-2 overflow-x-auto max-w-full py-1" id="tapeVisualizer">
+                        <!-- Dynamic Tape Cells -->
+                    </div>
+
+                    <!-- Status Text Indicator -->
+                    <div id="statusBanner" class="px-4 py-1.5 rounded-xl border text-xs font-mono flex items-center gap-2 bg-skyTheme-bg border-skyTheme-cardBorder text-skyTheme-textDark shadow-sm">
+                        <i class="fa-solid fa-info-circle text-skyTheme-accentBlue"></i> Ingresa una cadena y presiona 'Paso' o 'Auto'.
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MAVEN PROJECT STRUCTURE MODAL (REFERENCE VISUAL) -->
+    <div id="mavenModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white border border-skyTheme-cardBorder rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-skyTheme-cardBorder bg-skyTheme-cloudPuff/40 flex justify-between items-center">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-brands fa-java text-amber-600 text-xl"></i>
+                    <h3 class="text-sm font-extrabold text-skyTheme-textDark tracking-wide">Estructura del Proyecto Java Maven (AutomatonSimulador)</h3>
+                </div>
+                <button onclick="toggleMavenModal()" class="text-skyTheme-textMuted hover:text-skyTheme-textDark transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content Body -->
+            <div class="p-6 overflow-y-auto space-y-4 code-font text-xs">
+                <p class="text-skyTheme-textMuted font-sans text-xs">
+                    Representación de la estructura del proyecto Java subyacente (<code class="text-skyTheme-accentBlue font-bold">AutomatonSimulador</code>):
+                </p>
+
+                <!-- Folder Tree -->
+                <div class="bg-skyTheme-bg p-4 rounded-xl border border-skyTheme-cardBorder text-skyTheme-textDark space-y-1.5 leading-relaxed shadow-inner">
+                    <div class="flex items-center gap-2 text-skyTheme-accentBlue font-bold">
+                        <i class="fa-solid fa-folder-open"></i> AutomatonSimulador
+                    </div>
+                    <div class="pl-4 space-y-1 border-l border-skyTheme-dewyBlue/60 ml-2">
+                        <div class="flex items-center gap-2 text-amber-600 font-semibold">
+                            <i class="fa-solid fa-file-code"></i> pom.xml
+                        </div>
+                        <div class="flex items-center gap-2 text-skyTheme-accentBlue">
+                            <i class="fa-solid fa-folder"></i> src
+                        </div>
+                        <div class="pl-4 space-y-1 border-l border-skyTheme-dewyBlue/60 ml-2">
+                            <div class="flex items-center gap-2 text-skyTheme-accentBlue">
+                                <i class="fa-solid fa-folder"></i> main
+                            </div>
+                            <div class="pl-4 space-y-1 border-l border-skyTheme-dewyBlue/60 ml-2">
+                                <div class="flex items-center gap-2 text-skyTheme-accentBlue">
+                                    <i class="fa-solid fa-folder"></i> java
+                                </div>
+                                <div class="pl-4 space-y-1 border-l border-skyTheme-dewyBlue/60 ml-2">
+                                    <div class="flex items-center gap-2 text-skyTheme-accentBlue">
+                                        <i class="fa-solid fa-folder"></i> com/mycompany/automatonsimulador
+                                    </div>
+                                    <div class="pl-4 space-y-1 border-l border-skyTheme-dewyBlue/60 ml-2">
+                                        <div class="flex items-center gap-2 text-skyTheme-textDark font-bold bg-skyTheme-buttercup p-1.5 rounded-lg border border-skyTheme-sunwashed shadow-sm">
+                                            <i class="fa-solid fa-file-lines text-amber-600"></i> AutomatonSimulador.java
+                                            <span class="text-[9px] text-skyTheme-textMuted font-normal ml-auto">(Clase Principal / Lógica)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 text-skyTheme-accentBlue">
+                                <i class="fa-solid fa-folder"></i> test
+                            </div>
+                        </div>
+
+                        <!-- Target Build Directory -->
+                        <div class="flex items-center gap-2 text-skyTheme-textMuted">
+                            <i class="fa-solid fa-folder"></i> target
+                        </div>
+                        <div class="pl-4 space-y-1 border-l border-skyTheme-dewyBlue/60 ml-2 text-skyTheme-textMuted">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-folder"></i> classes/com/mycompany/automatonsimulador
+                            </div>
+                            <div class="pl-4 border-l border-skyTheme-dewyBlue/60 ml-2">
+                                <div class="flex items-center gap-2 text-skyTheme-textMuted">
+                                    <i class="fa-solid fa-cube"></i> AutomatonSimulador.class
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Code snippet preview -->
+                <div class="space-y-1">
+                    <span class="text-skyTheme-textMuted font-sans text-xs">Vista previa del equivalente en Java backend:</span>
+                    <pre class="bg-skyTheme-bg p-3.5 rounded-xl border border-skyTheme-cardBorder text-[11px] text-skyTheme-textDark overflow-x-auto shadow-inner">
+<span class="text-skyTheme-accentBlue font-bold">package</span> com.mycompany.automatonsimulador;
+
+<span class="text-skyTheme-accentBlue font-bold">public class</span> <span class="text-amber-600 font-bold">AutomatonSimulador</span> {
+    <span class="text-skyTheme-accentBlue font-bold">public static void</span> <span class="text-skyTheme-accentBlue">main</span>(String[] args) {
+        System.out.println(<span class="text-emerald-700">"Simulador de Autómatas Inicializado..."</span>);
+        // Motor de Ejecución AFD / AFN
+    }
+}</pre>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-3 border-t border-skyTheme-cardBorder bg-skyTheme-bg flex justify-end">
+                <button onclick="toggleMavenModal()" class="px-4 py-2 rounded-xl bg-skyTheme-buttercup hover:bg-skyTheme-sunwashed border border-skyTheme-sunwashed text-skyTheme-textDark text-xs font-bold transition shadow-sm">
+                    Cerrar Visor
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT APPLICATION LOGIC -->
+    <script>
+        // --- GLOBAL AUTOMATON STATE DATA STRUCTURES ---
+        let nodes = [];
+        let edges = [];
+
+        // App States
+        let currentTool = 'select'; // select, addNode, addEdge, delete
+        let selectedElement = null; // { type: 'node'|'edge', obj: ref }
+        let edgeSourceNode = null;  // Used during transition creation
+
+        // Simulation Execution State
+        let currentStepIndex = -1;
+        let activeNodeIds = new Set();
+        let isAutoPlaying = false;
+        let autoPlayTimer = null;
+        let particleAnimations = []; // Particles travelling on edges
+
+        // Canvas Elements & Context
+        const canvas = document.getElementById('automatonCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvasContainer');
+
+        // Initial setup on load
+        window.onload = function() {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            loadPreset('endsWith01');
+            setupCanvasEvents();
+            requestAnimationFrame(renderLoop);
+        };
+
+        function resizeCanvas() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+
+        // --- PRESET AUTOMATONS ---
+        function loadPreset(type) {
+            resetSimulation();
+            nodes = [];
+            edges = [];
+            selectedElement = null;
+
+            const cx = canvas.width / 2 || 400;
+            const cy = canvas.height / 2 || 250;
+
+            if (type === 'endsWith01') {
+                // Accepts strings ending in '01'
+                nodes = [
+                    { id: 'q0', name: 'q0', x: cx - 220, y: cy, isInitial: true, isFinal: false },
+                    { id: 'q1', name: 'q1', x: cx, y: cy, isInitial: false, isFinal: false },
+                    { id: 'q2', name: 'q2', x: cx + 220, y: cy, isInitial: false, isFinal: true }
+                ];
+                edges = [
+                    { id: 'e1', from: 'q0', to: 'q0', symbol: '1' },
+                    { id: 'e2', from: 'q0', to: 'q1', symbol: '0' },
+                    { id: 'e3', from: 'q1', to: 'q1', symbol: '0' },
+                    { id: 'e4', from: 'q1', to: 'q2', symbol: '1' },
+                    { id: 'e5', from: 'q2', to: 'q1', symbol: '0' },
+                    { id: 'e6', from: 'q2', to: 'q0', symbol: '1' }
+                ];
+                document.getElementById('inputTapeString').value = "1001";
+            } else if (type === 'evenA') {
+                // Accepts even number of 'a's
+                nodes = [
+                    { id: 'q0', name: 'q0 (Par)', x: cx - 120, y: cy, isInitial: true, isFinal: true },
+                    { id: 'q1', name: 'q1 (Impar)', x: cx + 120, y: cy, isInitial: false, isFinal: false }
+                ];
+                edges = [
+                    { id: 'e1', from: 'q0', to: 'q0', symbol: 'b' },
+                    { id: 'e2', from: 'q0', to: 'q1', symbol: 'a' },
+                    { id: 'e3', from: 'q1', to: 'q1', symbol: 'b' },
+                    { id: 'e4', from: 'q1', to: 'q0', symbol: 'a' }
+                ];
+                document.getElementById('inputTapeString').value = "abaa";
+            } else if (type === 'nfaExample') {
+                // NFA contains '11'
+                nodes = [
+                    { id: 'q0', name: 'q0', x: cx - 200, y: cy, isInitial: true, isFinal: false },
+                    { id: 'q1', name: 'q1', x: cx, y: cy, isInitial: false, isFinal: false },
+                    { id: 'q2', name: 'q2', x: cx + 200, y: cy, isInitial: false, isFinal: true }
+                ];
+                edges = [
+                    { id: 'e1', from: 'q0', to: 'q0', symbol: '0,1' },
+                    { id: 'e2', from: 'q0', to: 'q1', symbol: '1' },
+                    { id: 'e3', from: 'q1', to: 'q2', symbol: '1' },
+                    { id: 'e4', from: 'q2', to: 'q2', symbol: '0,1' }
+                ];
+                document.getElementById('inputTapeString').value = "0110";
+            }
+
+            updateInspector();
+            updateMatrixTable();
+            updateTapeUI();
+            checkAutomatonType();
+        }
+
+        // --- INTERACTIVE TOOL SYSTEM ---
+        function setTool(tool) {
+            currentTool = tool;
+            edgeSourceNode = null;
+            document.querySelectorAll('#contentDesign button').forEach(b => {
+                b.classList.remove('bg-skyTheme-buttercup', 'border-skyTheme-sunwashed', 'text-skyTheme-textDark', 'shadow-sm');
+                b.classList.add('border-skyTheme-cardBorder', 'bg-white', 'text-skyTheme-textDark');
+            });
+            const activeBtn = document.getElementById('tool' + tool.charAt(0).toUpperCase() + tool.slice(1));
+            if (activeBtn) {
+                activeBtn.classList.remove('border-skyTheme-cardBorder', 'bg-white');
+                activeBtn.classList.add('bg-skyTheme-buttercup', 'border-skyTheme-sunwashed', 'text-skyTheme-textDark', 'shadow-sm');
+            }
+        }
+
+        function setLeftTab(tab) {
+            if (tab === 'design') {
+                document.getElementById('contentDesign').classList.remove('hidden');
+                document.getElementById('contentMatrix').classList.add('hidden');
+                document.getElementById('tabDesign').className = "flex-1 py-1.5 rounded-md text-center bg-white text-skyTheme-textDark shadow-sm border border-skyTheme-cardBorder";
+                document.getElementById('tabMatrix').className = "flex-1 py-1.5 rounded-md text-center text-skyTheme-textMuted hover:text-skyTheme-textDark hover:bg-white/50 transition";
+            } else {
+                document.getElementById('contentDesign').classList.add('hidden');
+                document.getElementById('contentMatrix').classList.remove('hidden');
+                document.getElementById('tabMatrix').className = "flex-1 py-1.5 rounded-md text-center bg-white text-skyTheme-textDark shadow-sm border border-skyTheme-cardBorder";
+                document.getElementById('tabDesign').className = "flex-1 py-1.5 rounded-md text-center text-skyTheme-textMuted hover:text-skyTheme-textDark hover:bg-white/50 transition";
+                updateMatrixTable();
+            }
+        }
+
+        // --- CANVAS EVENTS & INTERACTION ---
+        let isDragging = false;
+        let dragNode = null;
+
+        function setupCanvasEvents() {
+            canvas.addEventListener('mousedown', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const clickedNode = nodes.find(n => Math.hypot(n.x - x, n.y - y) < 28);
+
+                if (currentTool === 'select') {
+                    if (clickedNode) {
+                        isDragging = true;
+                        dragNode = clickedNode;
+                        selectedElement = { type: 'node', obj: clickedNode };
+                    } else {
+                        // Check edge click
+                        const clickedEdge = findClickedEdge(x, y);
+                        if (clickedEdge) {
+                            selectedElement = { type: 'edge', obj: clickedEdge };
+                        } else {
+                            selectedElement = null;
+                        }
+                    }
+                } else if (currentTool === 'addNode') {
+                    const newId = 'q' + nodes.length;
+                    const newNode = {
+                        id: newId,
+                        name: newId,
+                        x: x,
+                        y: y,
+                        isInitial: nodes.length === 0,
+                        isFinal: false
+                    };
+                    nodes.push(newNode);
+                    selectedElement = { type: 'node', obj: newNode };
+                    checkAutomatonType();
+                } else if (currentTool === 'addEdge') {
+                    if (clickedNode) {
+                        if (!edgeSourceNode) {
+                            edgeSourceNode = clickedNode;
+                        } else {
+                            // Create edge
+                            const existing = edges.find(e => e.from === edgeSourceNode.id && e.to === clickedNode.id);
+                            if (existing) {
+                                existing.symbol += ',0';
+                            } else {
+                                edges.push({
+                                    id: 'e' + Date.now(),
+                                    from: edgeSourceNode.id,
+                                    to: clickedNode.id,
+                                    symbol: '0'
+                                });
+                            }
+                            edgeSourceNode = null;
+                            checkAutomatonType();
+                        }
+                    } else {
+                        edgeSourceNode = null;
+                    }
+                } else if (currentTool === 'delete') {
+                    if (clickedNode) {
+                        nodes = nodes.filter(n => n.id !== clickedNode.id);
+                        edges = edges.filter(e => e.from !== clickedNode.id && e.to !== clickedNode.id);
+                        selectedElement = null;
+                    } else {
+                        const clickedEdge = findClickedEdge(x, y);
+                        if (clickedEdge) {
+                            edges = edges.filter(e => e.id !== clickedEdge.id);
+                            selectedElement = null;
+                        }
+                    }
+                    checkAutomatonType();
+                }
+
+                updateInspector();
+                updateMatrixTable();
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging && dragNode) {
+                    const rect = canvas.getBoundingClientRect();
+                    dragNode.x = e.clientX - rect.left;
+                    dragNode.y = e.clientY - rect.top;
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                dragNode = null;
+            });
+        }
+
+        function findClickedEdge(x, y) {
+            for (let edge of edges) {
+                const src = nodes.find(n => n.id === edge.from);
+                const tgt = nodes.find(n => n.id === edge.to);
+                if (!src || !tgt) continue;
+
+                if (src.id === tgt.id) {
+                    // Loop edge
+                    const loopX = src.x;
+                    const loopY = src.y - 45;
+                    if (Math.hypot(loopX - x, loopY - y) < 20) return edge;
+                } else {
+                    // Line center point
+                    const midX = (src.x + tgt.x) / 2;
+                    const midY = (src.y + tgt.y) / 2;
+                    if (Math.hypot(midX - x, midY - y) < 18) return edge;
+                }
+            }
+            return null;
+        }
+
+        // --- INSPECTOR UI UPDATER ---
+        function updateInspector() {
+            const container = document.getElementById('inspectorContent');
+            const typeLabel = document.getElementById('selectedElemType');
+
+            document.getElementById('statNodesCount').innerText = nodes.length;
+            document.getElementById('statEdgesCount').innerText = edges.length;
+
+            if (!selectedElement) {
+                typeLabel.innerText = "Ninguno";
+                container.innerHTML = `<p class="text-skyTheme-textMuted italic py-2 text-center">Haz clic en un estado o transición para editar sus parámetros.</p>`;
+                return;
+            }
+
+            if (selectedElement.type === 'node') {
+                const node = selectedElement.obj;
+                typeLabel.innerText = "Estado";
+                container.innerHTML = `
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="text-skyTheme-textMuted font-bold block mb-1">Nombre del Estado</label>
+                            <input type="text" value="${node.name}" onchange="updateNodeProp('name', this.value)"
+                                class="w-full bg-white border border-skyTheme-cardBorder rounded-lg px-2.5 py-1.5 text-skyTheme-textDark code-font font-bold focus:outline-none focus:border-skyTheme-morningBreeze shadow-sm">
+                        </div>
+                        <div class="flex items-center justify-between pt-1">
+                            <span class="text-skyTheme-textDark font-semibold">¿Estado Inicial?</span>
+                            <input type="checkbox" ${node.isInitial ? 'checked' : ''} onchange="updateNodeProp('isInitial', this.checked)" class="accent-skyTheme-accentBlue cursor-pointer w-4 h-4">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-skyTheme-textDark font-semibold">¿Estado Final / Aceptador?</span>
+                            <input type="checkbox" ${node.isFinal ? 'checked' : ''} onchange="updateNodeProp('isFinal', this.checked)" class="accent-amber-500 cursor-pointer w-4 h-4">
+                        </div>
+                    </div>
+                `;
+            } else if (selectedElement.type === 'edge') {
+                const edge = selectedElement.obj;
+                typeLabel.innerText = "Transición";
+                container.innerHTML = `
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="text-skyTheme-textMuted font-bold block mb-1">Símbolos (separados por coma)</label>
+                            <input type="text" value="${edge.symbol}" onchange="updateEdgeProp('symbol', this.value)"
+                                class="w-full bg-white border border-skyTheme-cardBorder rounded-lg px-2.5 py-1.5 text-skyTheme-textDark code-font font-bold focus:outline-none focus:border-skyTheme-morningBreeze shadow-sm">
+                        </div>
+                        <div class="text-[11px] text-skyTheme-textMuted">
+                            Origen: <b class="text-skyTheme-textDark">${edge.from}</b> &rarr; Destino: <b class="text-skyTheme-textDark">${edge.to}</b>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function updateNodeProp(key, value) {
+            if (selectedElement && selectedElement.type === 'node') {
+                if (key === 'isInitial' && value) {
+                    nodes.forEach(n => n.isInitial = false);
+                }
+                selectedElement.obj[key] = value;
+                checkAutomatonType();
+                updateMatrixTable();
+            }
+        }
+
+        function updateEdgeProp(key, value) {
+            if (selectedElement && selectedElement.type === 'edge') {
+                selectedElement.obj[key] = value;
+                checkAutomatonType();
+                updateMatrixTable();
+            }
+        }
+
+        function clearCanvas() {
+            nodes = [];
+            edges = [];
+            selectedElement = null;
+            resetSimulation();
+            updateInspector();
+            updateMatrixTable();
+            checkAutomatonType();
+        }
+
+        function autoLayout() {
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const count = nodes.length;
+            if (count === 0) return;
+
+            const radius = Math.min(cx, cy) - 80;
+            nodes.forEach((node, i) => {
+                const angle = (i / count) * 2 * Math.PI;
+                node.x = cx + radius * Math.cos(angle);
+                node.y = cy + radius * Math.sin(angle);
+            });
+        }
+
+        // --- MATRIX TABLE GENERATOR ---
+        function updateMatrixTable() {
+            const container = document.getElementById('matrixContainer');
+            if (nodes.length === 0) {
+                container.innerHTML = `<p class="text-skyTheme-textMuted italic text-xs p-3">Sin estados definidos.</p>`;
+                return;
+            }
+
+            // Extract alphabet
+            let symbolsSet = new Set();
+            edges.forEach(e => {
+                e.symbol.split(',').map(s => s.trim()).forEach(s => {
+                    if (s) symbolsSet.add(s);
+                });
+            });
+            const alphabet = Array.from(symbolsSet).sort();
+
+            let html = `<table class="w-full text-xs text-left text-skyTheme-textDark border-collapse code-font">
+                <thead class="bg-skyTheme-bg text-skyTheme-textMuted uppercase border-b border-skyTheme-cardBorder">
+                    <tr>
+                        <th class="p-2.5 border-r border-skyTheme-cardBorder">Estado</th>
+                        ${alphabet.map(s => `<th class="p-2.5 border-r border-skyTheme-cardBorder text-center text-skyTheme-accentBlue font-bold">${s}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            nodes.forEach(n => {
+                let prefix = '';
+                if (n.isInitial) prefix += '&#8594; ';
+                if (n.isFinal) prefix += '* ';
+
+                html += `<tr class="border-b border-skyTheme-cardBorder hover:bg-skyTheme-cloudPuff/30 transition">
+                    <td class="p-2.5 border-r border-skyTheme-cardBorder font-bold ${n.isFinal ? 'text-amber-600' : 'text-skyTheme-textDark'}">
+                        ${prefix}${n.name}
+                    </td>`;
+
+                alphabet.forEach(sym => {
+                    const matchedEdges = edges.filter(e => e.from === n.id && e.symbol.split(',').map(s => s.trim()).includes(sym));
+                    const dests = matchedEdges.map(e => {
+                        const targetNode = nodes.find(nd => nd.id === e.to);
+                        return targetNode ? targetNode.name : e.to;
+                    });
+
+                    html += `<td class="p-2.5 border-r border-skyTheme-cardBorder text-center ${dests.length > 1 ? 'text-amber-600 font-bold' : 'text-skyTheme-textDark'}">
+                        ${dests.length > 0 ? dests.join(', ') : '&empty;'}
+                    </td>`;
+                });
+
+                html += `</tr>`;
+            });
+
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+
+        // --- SIMULATION & ENGINE EXECUTION ---
+        function checkAutomatonType() {
+            let isNFA = false;
+
+            edges.forEach(e => {
+                e.symbol.split(',').map(s => s.trim()).forEach(s => {
+                    if (s === 'ε' || s === 'E' || s === '') isNFA = true;
+                });
+            });
+
+            for (let node of nodes) {
+                let symCount = {};
+                const outEdges = edges.filter(e => e.from === node.id);
+                for (let e of outEdges) {
+                    const syms = e.symbol.split(',').map(s => s.trim());
+                    for (let s of syms) {
+                        symCount[s] = (symCount[s] || 0) + 1;
+                        if (symCount[s] > 1) isNFA = true;
+                    }
+                }
+            }
+
+            const tag = document.getElementById('automatonTypeTag');
+            if (isNFA) {
+                tag.innerText = "Autómata AFN (NFA)";
+                tag.className = "text-amber-600 code-font font-bold";
+            } else {
+                tag.innerText = "Autómata AFD (DFA)";
+                tag.className = "text-skyTheme-accentBlue code-font font-bold";
+            }
+        }
+
+        function resetSimulation() {
+            currentStepIndex = -1;
+            const initNode = nodes.find(n => n.isInitial);
+            activeNodeIds = new Set(initNode ? [initNode.id] : []);
+            particleAnimations = [];
+            stopAutoPlay();
+            updateTapeUI();
+            updateStatusBanner("Simulación reiniciada.", "info");
+        }
+
+        function updateTapeUI() {
+            const tapeStr = document.getElementById('inputTapeString').value || "";
+            const container = document.getElementById('tapeVisualizer');
+            container.innerHTML = "";
+
+            if (tapeStr.length === 0) {
+                container.innerHTML = `<span class="text-xs text-skyTheme-textMuted italic">Cinta vacía</span>`;
+                return;
+            }
+
+            for (let i = 0; i < tapeStr.length; i++) {
+                const char = tapeStr[i];
+                const isCurrent = (i === currentStepIndex);
+                const isProcessed = (i < currentStepIndex);
+
+                const cell = document.createElement('div');
+                cell.className = `w-8 h-9 rounded-xl border flex items-center justify-center code-font font-bold text-sm transition-all duration-300 ${
+                    isCurrent
+                        ? 'bg-skyTheme-buttercup border-skyTheme-sunwashed text-skyTheme-textDark scale-110 shadow-sm glow-yellow'
+                        : isProcessed
+                        ? 'bg-skyTheme-bg border-skyTheme-cardBorder text-skyTheme-textMuted'
+                        : 'bg-white border-skyTheme-cardBorder text-skyTheme-textDark shadow-sm'
+                }`;
+                cell.innerText = char;
+                container.appendChild(cell);
+            }
+        }
+
+        function stepSimulation() {
+            const tapeStr = document.getElementById('inputTapeString').value;
+
+            if (nodes.length === 0) {
+                updateStatusBanner("Error: Agrega estados al autómata.", "error");
+                return;
+            }
+
+            if (activeNodeIds.size === 0) {
+                const initNode = nodes.find(n => n.isInitial);
+                if (!initNode) {
+                    updateStatusBanner("Error: No hay estado inicial definido.", "error");
+                    return;
+                }
+                activeNodeIds.add(initNode.id);
+            }
+
+            if (currentStepIndex >= tapeStr.length - 1) {
+                let hasAccepted = false;
+                activeNodeIds.forEach(id => {
+                    const n = nodes.find(nd => nd.id === id);
+                    if (n && n.isFinal) hasAccepted = true;
+                });
+
+                if (hasAccepted) {
+                    updateStatusBanner("¡CADENA ACEPTADA! El estado actual es final.", "success");
+                } else {
+                    updateStatusBanner("CADENA RECHAZADA. No finalizó en un estado aceptador.", "error");
+                }
+                stopAutoPlay();
+                return;
+            }
+
+            currentStepIndex++;
+            const charRead = tapeStr[currentStepIndex];
+            const nextActive = new Set();
+
+            activeNodeIds.forEach(srcId => {
+                const matchedEdges = edges.filter(e => e.from === srcId && e.symbol.split(',').map(s => s.trim()).includes(charRead));
+                matchedEdges.forEach(edge => {
+                    nextActive.add(edge.to);
+                    // Spawn particle animation
+                    const srcNode = nodes.find(n => n.id === edge.from);
+                    const tgtNode = nodes.find(n => n.id === edge.to);
+                    if (srcNode && tgtNode) {
+                        particleAnimations.push({
+                            srcX: srcNode.x, srcY: srcNode.y,
+                            tgtX: tgtNode.x, tgtY: tgtNode.y,
+                            progress: 0,
+                            symbol: charRead
+                        });
+                    }
+                });
+            });
+
+            activeNodeIds = nextActive;
+            updateTapeUI();
+
+            if (activeNodeIds.size === 0) {
+                updateStatusBanner(`Rechazado: Sin transición para '${charRead}'.`, "error");
+                stopAutoPlay();
+            } else {
+                updateStatusBanner(`Paso ${currentStepIndex + 1}: Leyendo '${charRead}' &rarr; Estados activos: ${Array.from(activeNodeIds).map(id => nodes.find(n=>n.id===id).name).join(', ')}`, "info");
+            }
+        }
+
+        function toggleAutoPlay() {
+            if (isAutoPlaying) {
+                stopAutoPlay();
+            } else {
+                isAutoPlaying = true;
+                document.getElementById('playIcon').className = "fa-solid fa-pause";
+
+                const interval = parseInt(document.getElementById('speedSlider').value) || 800;
+                stepSimulation();
+                autoPlayTimer = setInterval(() => {
+                    const tapeStr = document.getElementById('inputTapeString').value;
+                    if (currentStepIndex >= tapeStr.length - 1 || activeNodeIds.size === 0) {
+                        stopAutoPlay();
+                    } else {
+                        stepSimulation();
+                    }
+                }, interval);
+            }
+        }
+
+        function stopAutoPlay() {
+            isAutoPlaying = false;
+            if (autoPlayTimer) clearInterval(autoPlayTimer);
+            document.getElementById('playIcon').className = "fa-solid fa-play";
+        }
+
+        function instantTest() {
+            const tapeStr = document.getElementById('inputTapeString').value;
+            const initNode = nodes.find(n => n.isInitial);
+
+            if (!initNode) {
+                updateStatusBanner("Error: Define un estado inicial primero.", "error");
+                return;
+            }
+
+            let currentStates = new Set([initNode.id]);
+
+            for (let char of tapeStr) {
+                let nextStates = new Set();
+                currentStates.forEach(id => {
+                    const matched = edges.filter(e => e.from === id && e.symbol.split(',').map(s => s.trim()).includes(char));
+                    matched.forEach(e => nextStates.add(e.to));
+                });
+                currentStates = nextStates;
+            }
+
+            let isAccepted = false;
+            currentStates.forEach(id => {
+                const n = nodes.find(nd => nd.id === id);
+                if (n && n.isFinal) isAccepted = true;
+            });
+
+            if (isAccepted) {
+                updateStatusBanner(`Verificación Rápida: Cadena "${tapeStr}" ES ACEPTADA.`, "success");
+            } else {
+                updateStatusBanner(`Verificación Rápida: Cadena "${tapeStr}" ES RECHAZADA.`, "error");
+            }
+        }
+
+        function updateStatusBanner(text, type) {
+            const banner = document.getElementById('statusBanner');
+            if (type === 'success') {
+                banner.className = "px-4 py-1.5 rounded-xl border text-xs font-mono flex items-center gap-2 bg-emerald-50 border-emerald-200 text-emerald-800 shadow-sm";
+                banner.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600"></i> ${text}`;
+            } else if (type === 'error') {
+                banner.className = "px-4 py-1.5 rounded-xl border text-xs font-mono flex items-center gap-2 bg-rose-50 border-rose-200 text-rose-800 shadow-sm";
+                banner.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-600"></i> ${text}`;
+            } else {
+                banner.className = "px-4 py-1.5 rounded-xl border text-xs font-mono flex items-center gap-2 bg-skyTheme-bg border-skyTheme-cardBorder text-skyTheme-textDark shadow-sm";
+                banner.innerHTML = `<i class="fa-solid fa-info-circle text-skyTheme-accentBlue"></i> ${text}`;
+            }
+        }
+
+        // --- SPEED SLIDER BINDING ---
+        document.getElementById('speedSlider').addEventListener('input', (e) => {
+            document.getElementById('speedLabel').innerText = e.target.value + 'ms';
+            if (isAutoPlaying) {
+                stopAutoPlay();
+                toggleAutoPlay();
+            }
+        });
+
+        // --- MAVEN MODAL TOGGLE ---
+        function toggleMavenModal() {
+            const modal = document.getElementById('mavenModal');
+            modal.classList.toggle('hidden');
+        }
+
+        // --- CANVAS RENDER LOOP (BUTTERCUP SKY PALETTE GRAPHICS) ---
+        function renderLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Edges / Transitions
+            edges.forEach(edge => {
+                const src = nodes.find(n => n.id === edge.from);
+                const tgt = nodes.find(n => n.id === edge.to);
+                if (!src || !tgt) return;
+
+                const isSelected = selectedElement && selectedElement.type === 'edge' && selectedElement.obj.id === edge.id;
+
+                ctx.strokeStyle = isSelected ? '#FFE08A' : '#7FA8D6';
+                ctx.lineWidth = isSelected ? 3.5 : 2;
+
+                if (src.id === tgt.id) {
+                    // Self loop
+                    ctx.beginPath();
+                    ctx.arc(src.x, src.y - 35, 20, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Loop Label
+                    ctx.font = '600 12px JetBrains Mono';
+                    ctx.fillStyle = '#3A506B';
+                    ctx.fillText(edge.symbol, src.x - 5, src.y - 60);
+                } else {
+                    // Straight Line
+                    const angle = Math.atan2(tgt.y - src.y, tgt.x - src.x);
+                    const startX = src.x + 28 * Math.cos(angle);
+                    const startY = src.y + 28 * Math.sin(angle);
+                    const endX = tgt.x - 28 * Math.cos(angle);
+                    const endY = tgt.y - 28 * Math.sin(angle);
+
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+
+                    // Arrowhead
+                    ctx.beginPath();
+                    ctx.fillStyle = isSelected ? '#FFE08A' : '#7FA8D6';
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(endX - 10 * Math.cos(angle - Math.PI / 6), endY - 10 * Math.sin(angle - Math.PI / 6));
+                    ctx.lineTo(endX - 10 * Math.cos(angle + Math.PI / 6), endY - 10 * Math.sin(angle + Math.PI / 6));
+                    ctx.fill();
+
+                    // Transition Label
+                    const midX = (startX + endX) / 2;
+                    const midY = (startY + endY) / 2;
+                    ctx.font = '700 12px JetBrains Mono';
+                    ctx.fillStyle = '#3A506B';
+                    ctx.fillText(edge.symbol, midX - 8, midY - 8);
+                }
+            });
+
+            // Draw Particles Animation
+            for (let i = particleAnimations.length - 1; i >= 0; i--) {
+                const p = particleAnimations[i];
+                p.progress += 0.04;
+
+                const curX = p.srcX + (p.tgtX - p.srcX) * p.progress;
+                const curY = p.srcY + (p.tgtY - p.srcY) * p.progress;
+
+                ctx.beginPath();
+                ctx.arc(curX, curY, 7, 0, Math.PI * 2);
+                ctx.fillStyle = '#FFE08A';
+                ctx.shadowColor = '#FFE08A';
+                ctx.shadowBlur = 12;
+                ctx.fill();
+                ctx.shadowBlur = 0; // reset glow
+
+                if (p.progress >= 1) {
+                    particleAnimations.splice(i, 1);
+                }
+            }
+
+            // Draw Nodes / States
+            nodes.forEach(node => {
+                const isActive = activeNodeIds.has(node.id);
+                const isSelected = selectedElement && selectedElement.type === 'node' && selectedElement.obj.id === node.id;
+
+                // Active Halo Ring (Dewy Blue Highlight)
+                if (isActive) {
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, 36, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 224, 138, 0.8)';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+                }
+
+                // Node Body
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, 26, 0, Math.PI * 2);
+                ctx.fillStyle = isActive ? '#FFF2B2' : (isSelected ? '#FFF7D6' : '#FFFFFF');
+                ctx.fill();
+
+                ctx.strokeStyle = isActive ? '#FFE08A' : (isSelected ? '#4A739C' : (node.isFinal ? '#FFE08A' : '#A8C6E7'));
+                ctx.lineWidth = isSelected || isActive ? 3.5 : 2;
+                ctx.stroke();
+
+                // Double Circle for Final Accepting State
+                if (node.isFinal) {
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, 21, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#3A506B';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+
+                // Initial State Arrow
+                if (node.isInitial) {
+                    ctx.beginPath();
+                    ctx.moveTo(node.x - 45, node.y);
+                    ctx.lineTo(node.x - 28, node.y);
+                    ctx.strokeStyle = '#7FA8D6';
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+
+                    // Arrowhead
+                    ctx.beginPath();
+                    ctx.fillStyle = '#7FA8D6';
+                    ctx.moveTo(node.x - 28, node.y);
+                    ctx.lineTo(node.x - 34, node.y - 5);
+                    ctx.lineTo(node.x - 34, node.y + 5);
+                    ctx.fill();
+                }
+
+                // Node Text
+                ctx.font = '700 12px Plus Jakarta Sans';
+                ctx.fillStyle = '#2C3E50';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(node.name, node.x, node.y);
+            });
+
+            requestAnimationFrame(renderLoop);
+        }
+    </script>
+</body>
+</html>
