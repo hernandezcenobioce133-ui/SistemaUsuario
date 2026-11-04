@@ -1,0 +1,248 @@
+{
+  "name": "Analizador sintáctico LL(1) interactivo",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Analizador sintáctico LL(1)",
+        "formDescription": "Escriba una producción por línea con el formato <b>A -> aB | b</b>. Use ε para la cadena vacía. $ (fin de entrada) está reservado.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Gramática",
+              "fieldType": "textarea",
+              "fieldName": "grammar",
+              "defaultValue": "E -> T E'\nE' -> + T E' | ε\nT -> F T'\nT' -> * F T' | ε\nF -> ( E ) | id",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Símbolo inicial",
+              "fieldName": "startSymbol",
+              "defaultValue": "E",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Cadena a analizar (opcional)",
+              "fieldName": "inputString",
+              "placeholder": "Ej.: id + id * id (use ε para la cadena vacía)",
+              "defaultValue": "id + id * id"
+            },
+            {
+              "fieldLabel": "Terminales de varios caracteres (opcional)",
+              "fieldName": "multiTerminals",
+              "placeholder": "Separados por coma, ej.: id, num",
+              "defaultValue": "id"
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "6a6da1b9-761c-42a1-8029-61de1502a1f6",
+      "name": "Ingresar gramática",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "2bdc1528-2fad-4bb0-b2f9-d58b6adae45c"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst data = $input.first().json;\nconst NL = String.fromCharCode(10);\nconst CR = String.fromCharCode(13);\nconst TAB = String.fromCharCode(9);\nconst EPS = ['ε', 'epsilon', 'λ'];\nconst errors = [];\nconst warnings = [];\nconst norm = (s) => String(s == null ? '' : s).split(CR).join('').split(TAB).join(' ');\nfunction pick(names, kws) {\n  for (const n of names) { if (data[n] !== undefined) return data[n]; }\n  for (const k of Object.keys(data)) {\n    const lk = k.toLowerCase();\n    for (const w of kws) { if (lk.indexOf(w) >= 0) return data[k]; }\n  }\n  return '';\n}\nconst grammarText = norm(pick(['grammar'], ['gram']));\nconst start = norm(pick(['startSymbol'], ['inicial', 'start'])).trim();\nconst inputRaw = norm(pick(['inputString'], ['cadena', 'input'])).trim();\nconst multi = norm(pick(['multiTerminals'], ['varios', 'multi'])).split(',').map((s) => s.trim()).filter((s) => s.length > 0);\n\nconst rawLines = grammarText.split(NL);\nconst parsed = [];\nconst nts = [];\nrawLines.forEach((line, idx) => {\n  const ln = idx + 1;\n  let t = line.trim();\n  if (t.length === 0 || t[0] === '#') return;\n  t = t.split('→').join('->').split('::=').join('->');\n  const pos = t.indexOf('->');\n  if (pos < 0) { errors.push('Línea ' + ln + ': falta el separador \"->\" (formato esperado: A -> aB | b).'); return; }\n  const lhs = t.slice(0, pos).trim();\n  if (lhs.length === 0) { errors.push('Línea ' + ln + ': falta el no terminal a la izquierda de \"->\".'); return; }\n  if (lhs.indexOf(' ') >= 0) { errors.push('Línea ' + ln + ': el lado izquierdo \"' + lhs + '\" debe ser un único símbolo no terminal.'); return; }\n  if (lhs.indexOf('|') >= 0 || lhs === '$' || EPS.indexOf(lhs) >= 0) { errors.push('Línea ' + ln + ': \"' + lhs + '\" no es un no terminal válido.'); return; }\n  const rhs = t.slice(pos + 2);\n  if (rhs.trim().length === 0) { errors.push('Línea ' + ln + ': el lado derecho está vacío (use ε para la cadena vacía).'); return; }\n  const alts = rhs.split('|').map((a) => a.trim());\n  alts.forEach((a, ai) => {\n    if (a.length === 0) errors.push('Línea ' + ln + ': la alternativa ' + (ai + 1) + ' está vacía (use ε para la cadena vacía).');\n  });\n  if (nts.indexOf(lhs) < 0) nts.push(lhs);\n  parsed.push({ ln: ln, lhs: lhs, alts: alts });\n});\nif (parsed.length === 0 && errors.length === 0) errors.push('La gramática está vacía. Escriba al menos una producción, por ejemplo: S -> aS | b');\n\nconst cands = [];\nEPS.forEach((e) => cands.push({ s: e, k: 'eps' }));\nmulti.forEach((m) => {\n  if (nts.indexOf(m) >= 0) errors.push('\"' + m + '\" está declarado como terminal de varios caracteres pero también es un no terminal.');\n  else cands.push({ s: m, k: 't' });\n});\nnts.forEach((n) => cands.push({ s: n, k: 'nt' }));\ncands.sort((a, b) => b.s.length - a.s.length);\n\nconst terminals = [];\nconst prods = [];\nparsed.forEach((p) => {\n  p.alts.forEach((alt) => {\n    if (alt.length === 0) return;\n    const tokens = [];\n    const chunks = alt.split(' ').filter((c) => c.length > 0);\n    chunks.forEach((chunk) => {\n      const chars = Array.from(chunk);\n      let i = 0;\n      while (i < chunk.length) {\n        let found = null;\n        for (const c of cands) { if (chunk.startsWith(c.s, i)) { found = c; break; } }\n        if (found) {\n          tokens.push({ s: found.k === 'eps' ? 'ε' : found.s, k: found.k });\n          i += found.s.length;\n        } else {\n          const cp = String.fromCodePoint(chunk.codePointAt(i));\n          if (cp === '$') {\n            errors.push('Línea ' + p.ln + ': el símbolo \"$\" está reservado para el fin de entrada y no puede usarse en producciones.');\n          } else if (cp.length === 1 && cp >= 'A' && cp <= 'Z') {\n            errors.push('Línea ' + p.ln + ': el símbolo \"' + cp + '\" parece un no terminal pero no tiene producciones definidas.');\n          } else {\n            tokens.push({ s: cp, k: 't' });\n          }\n          i += cp.length;\n        }\n      }\n    });\n    const hasEps = tokens.some((x) => x.k === 'eps');\n    if (hasEps && tokens.length > 1) {\n      errors.push('Línea ' + p.ln + ': ε debe aparecer sola en su alternativa (\"' + alt + '\").');\n      return;\n    }\n    const rhsSyms = hasEps ? [] : tokens.map((x) => x.s);\n    tokens.forEach((x) => { if (x.k === 't' && terminals.indexOf(x.s) < 0) terminals.push(x.s); });\n    prods.push({ id: prods.length, lhs: p.lhs, rhs: rhsSyms });\n  });\n});\n\nif (start.length === 0) errors.push('Debe indicar el símbolo inicial.');\nelse if (nts.indexOf(start) < 0 && parsed.length > 0) errors.push('El símbolo inicial \"' + start + '\" no tiene producciones en la gramática.');\n\nconst seen = {};\nprods.forEach((p) => {\n  const key = p.lhs + ' -> ' + p.rhs.join(' ');\n  if (seen[key]) warnings.push('Producción duplicada: ' + key + '. Esto genera conflicto en la tabla.');\n  seen[key] = true;\n});\nnts.forEach((n) => {\n  if (n !== start) {\n    const used = prods.some((p) => p.rhs.indexOf(n) >= 0);\n    if (!used) warnings.push('El no terminal ' + n + ' no se usa en ninguna producción (inalcanzable).');\n  }\n});\n\nconst termSorted = terminals.slice().sort();\nreturn [{ json: {\n  ok: errors.length === 0,\n  errors: errors,\n  warnings: warnings,\n  grammarText: grammarText,\n  start: start,\n  inputRaw: inputRaw,\n  nts: nts,\n  terminals: termSorted,\n  multiTerminals: multi,\n  prods: prods\n} }];\n"
+      },
+      "id": "7e2e35be-d50b-4a89-b8c0-1990d47878ef",
+      "name": "Validar y parsear gramática",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst d = $input.first().json;\nif (!d.ok) return [{ json: d }];\nconst ntset = new Set(d.nts);\nconst first = {};\nd.nts.forEach((n) => { first[n] = new Set(); });\nfunction firstOfSeq(seq) {\n  const res = new Set();\n  let allEps = true;\n  for (const s of seq) {\n    if (ntset.has(s)) {\n      for (const x of first[s]) { if (x !== 'ε') res.add(x); }\n      if (!first[s].has('ε')) { allEps = false; break; }\n    } else {\n      res.add(s);\n      allEps = false;\n      break;\n    }\n  }\n  if (allEps) res.add('ε');\n  return res;\n}\nlet changed = true;\nlet guard = 0;\nwhile (changed && guard < 10000) {\n  changed = false;\n  guard++;\n  for (const p of d.prods) {\n    const f = firstOfSeq(p.rhs);\n    for (const x of f) {\n      if (!first[p.lhs].has(x)) { first[p.lhs].add(x); changed = true; }\n    }\n  }\n}\nconst order = (arr) => arr.slice().sort((a, b) => (a === 'ε') - (b === 'ε') || (a < b ? -1 : a > b ? 1 : 0));\nconst firstSets = {};\nd.nts.forEach((n) => { firstSets[n] = order(Array.from(first[n])); });\nconst firstOfProds = d.prods.map((p) => order(Array.from(firstOfSeq(p.rhs))));\nreturn [{ json: Object.assign({}, d, { firstSets: firstSets, firstOfProds: firstOfProds }) }];\n"
+      },
+      "id": "ca4681ee-8069-4567-8f6c-0c230db6436d",
+      "name": "Calcular FIRST",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst d = $input.first().json;\nif (!d.ok) return [{ json: d }];\nconst ntset = new Set(d.nts);\nconst first = {};\nd.nts.forEach((n) => { first[n] = new Set(d.firstSets[n]); });\nfunction firstOfSeq(seq) {\n  const res = new Set();\n  let allEps = true;\n  for (const s of seq) {\n    if (ntset.has(s)) {\n      for (const x of first[s]) { if (x !== 'ε') res.add(x); }\n      if (!first[s].has('ε')) { allEps = false; break; }\n    } else {\n      res.add(s);\n      allEps = false;\n      break;\n    }\n  }\n  if (allEps) res.add('ε');\n  return res;\n}\nconst follow = {};\nd.nts.forEach((n) => { follow[n] = new Set(); });\nfollow[d.start].add('$');\nlet changed = true;\nlet guard = 0;\nwhile (changed && guard < 10000) {\n  changed = false;\n  guard++;\n  for (const p of d.prods) {\n    for (let i = 0; i < p.rhs.length; i++) {\n      const b = p.rhs[i];\n      if (!ntset.has(b)) continue;\n      const beta = p.rhs.slice(i + 1);\n      const fb = firstOfSeq(beta);\n      for (const x of fb) {\n        if (x !== 'ε' && !follow[b].has(x)) { follow[b].add(x); changed = true; }\n      }\n      if (fb.has('ε')) {\n        for (const x of follow[p.lhs]) {\n          if (!follow[b].has(x)) { follow[b].add(x); changed = true; }\n        }\n      }\n    }\n  }\n}\nconst order = (arr) => arr.slice().sort((a, b) => (a === '$') - (b === '$') || (a < b ? -1 : a > b ? 1 : 0));\nconst followSets = {};\nd.nts.forEach((n) => { followSets[n] = order(Array.from(follow[n])); });\nreturn [{ json: Object.assign({}, d, { followSets: followSets }) }];\n"
+      },
+      "id": "d355d993-6713-4ea1-aa87-326986a94acf",
+      "name": "Calcular FOLLOW",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst d = $input.first().json;\nif (!d.ok) return [{ json: d }];\nconst columns = d.terminals.concat(['$']);\nconst table = {};\nd.nts.forEach((n) => { table[n] = {}; });\nfunction add(nt, t, id, via) {\n  if (!table[nt][t]) table[nt][t] = [];\n  if (!table[nt][t].some((e) => e.id === id && e.via === via)) table[nt][t].push({ id: id, via: via });\n}\nd.prods.forEach((p) => {\n  const f = d.firstOfProds[p.id];\n  f.forEach((t) => { if (t !== 'ε') add(p.lhs, t, p.id, 'FIRST'); });\n  if (f.indexOf('ε') >= 0) {\n    d.followSets[p.lhs].forEach((t) => add(p.lhs, t, p.id, 'FOLLOW'));\n  }\n});\nconst conflicts = [];\nconst cols2 = columns.slice();\nd.nts.forEach((n) => {\n  Object.keys(table[n]).forEach((t) => {\n    const ids = Array.from(new Set(table[n][t].map((e) => e.id)));\n    if (ids.length > 1) {\n      const vias = new Set(table[n][t].map((e) => e.via));\n      const kind = vias.has('FOLLOW') ? 'FIRST/FOLLOW' : 'FIRST/FIRST';\n      conflicts.push({ nt: n, terminal: t, prods: ids, kind: kind });\n    }\n  });\n});\nconst warnings = (d.warnings || []).slice();\nd.prods.forEach((p) => {\n  if (p.rhs.length > 0 && p.rhs[0] === p.lhs) {\n    warnings.push('Recursión izquierda directa en ' + p.lhs + ' -> ' + p.rhs.join(' ') + ': la gramática no puede ser LL(1) y el análisis puede no terminar.');\n  }\n});\nreturn [{ json: Object.assign({}, d, { columns: cols2, table: table, conflicts: conflicts, isLL1: conflicts.length === 0, warnings: warnings }) }];\n"
+      },
+      "id": "98e253be-d414-42a1-b540-c1e4f7f575e2",
+      "name": "Matriz predictiva LL(1)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst d = $input.first().json;\nif (!d.ok) return [{ json: d }];\nconst EPS = ['ε', 'epsilon', 'λ'];\nconst ntset = new Set(d.nts);\nconst out = { provided: d.inputRaw.length > 0, accepted: false, tokens: [], steps: [], treeText: '', message: '', notes: [] };\nif (!out.provided) {\n  out.message = 'No se ingresó ninguna cadena; solo se calcularon FIRST, FOLLOW y la tabla.';\n  return [{ json: Object.assign({}, d, { parse: out }) }];\n}\nlet raw = d.inputRaw;\nif (raw.length > 1 && raw[raw.length - 1] === '$') raw = raw.slice(0, raw.length - 1).trim();\nelse if (raw === '$') raw = '';\nconst termCands = d.terminals.concat(d.multiTerminals || []);\ntermCands.sort((a, b) => b.length - a.length);\nlet tokens = [];\nlet tokError = '';\nif (raw.length > 0 && EPS.indexOf(raw) < 0) {\n  const chunks = raw.split(' ').filter((c) => c.length > 0);\n  for (const chunk of chunks) {\n    let i = 0;\n    while (i < chunk.length) {\n      let found = null;\n      for (const c of termCands) { if (chunk.startsWith(c, i)) { found = c; break; } }\n      if (found) { tokens.push(found); i += found.length; }\n      else {\n        const cp = String.fromCodePoint(chunk.codePointAt(i));\n        if (!tokError) tokError = 'El símbolo \"' + cp + '\" de la cadena no es un terminal de la gramática.';\n        tokens.push(cp);\n        i += cp.length;\n      }\n    }\n  }\n}\nout.tokens = tokens;\nif (tokError) {\n  out.message = 'Cadena RECHAZADA: ' + tokError;\n  out.treeText = '';\n  return [{ json: Object.assign({}, d, { parse: out }) }];\n}\nif (!d.isLL1) out.notes.push('La gramática no es LL(1): en las celdas con conflicto se usa la primera producción, por lo que el resultado puede ser incompleto.');\nconst root = { sym: d.start, children: [] };\nconst stack = [{ sym: '$', children: [] }, root];\nconst toks = tokens.concat(['$']);\nlet pos = 0;\nlet error = '';\nlet accepted = false;\nlet count = 0;\nconst fmt = (arr) => arr.join(' ');\nwhile (true) {\n  count++;\n  if (count > 3000 || stack.length > 1500) { error = 'Se detuvo el análisis: demasiados pasos (posible recursión izquierda o gramática cíclica).'; break; }\n  const top = stack[stack.length - 1];\n  const a = toks[pos];\n  const stackStr = fmt(stack.map((s) => s.sym).reverse());\n  const inStr = fmt(toks.slice(pos));\n  if (top.sym === '$') {\n    if (a === '$') { out.steps.push({ n: count, stack: stackStr, input: inStr, action: 'Aceptar' }); accepted = true; }\n    else { error = 'Sobran símbolos de entrada: \"' + a + '\".'; out.steps.push({ n: count, stack: stackStr, input: inStr, action: 'Error' }); }\n    break;\n  }\n  if (ntset.has(top.sym)) {\n    const cell = d.table[top.sym][a];\n    if (!cell || cell.length === 0) {\n      error = 'La celda M[' + top.sym + ', ' + a + '] está vacía: no hay producción aplicable.';\n      out.steps.push({ n: count, stack: stackStr, input: inStr, action: 'Error: M[' + top.sym + ', ' + a + '] vacía' });\n      break;\n    }\n    const p = d.prods[cell[0].id];\n    stack.pop();\n    if (p.rhs.length === 0) {\n      top.children = [{ sym: 'ε', children: [], eps: true }];\n    } else {\n      top.children = p.rhs.map((s) => ({ sym: s, children: [] }));\n      for (let i = top.children.length - 1; i >= 0; i--) stack.push(top.children[i]);\n    }\n    out.steps.push({ n: count, stack: stackStr, input: inStr, action: p.lhs + ' → ' + (p.rhs.length ? fmt(p.rhs) : 'ε') });\n  } else {\n    if (top.sym === a) {\n      stack.pop();\n      pos++;\n      out.steps.push({ n: count, stack: stackStr, input: inStr, action: 'Coincide \"' + a + '\"' });\n    } else {\n      error = 'Se esperaba \"' + top.sym + '\" pero se encontró \"' + a + '\".';\n      out.steps.push({ n: count, stack: stackStr, input: inStr, action: 'Error: se esperaba ' + top.sym });\n      break;\n    }\n  }\n}\nfunction render(node, prefix, isLast, isRoot, lines) {\n  if (isRoot) lines.push(node.sym);\n  else lines.push(prefix + (isLast ? '└── ' : '├── ') + node.sym);\n  const kids = node.children || [];\n  const np = isRoot ? '' : prefix + (isLast ? '    ' : '│   ');\n  kids.forEach((k, i) => render(k, np, i === kids.length - 1, false, lines));\n}\nconst lines = [];\nrender(root, '', true, true, lines);\nout.treeText = lines.join(String.fromCharCode(10));\nout.accepted = accepted;\nout.partialTree = !accepted;\nout.message = accepted ? 'Cadena ACEPTADA' : 'Cadena RECHAZADA: ' + error;\nreturn [{ json: Object.assign({}, d, { parse: out }) }];\n"
+      },
+      "id": "5e2d9bf5-7e03-4d6f-b6d7-7b71b348cd7c",
+      "name": "Análisis y árbol de derivación",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst d = $input.first().json;\nconst esc = (s) => String(s).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('\"').join('&quot;');\nconst TH = 'style=\"background:#2d3748;color:#fff;padding:6px 10px;border:1px solid #999;text-align:left\"';\nconst TD = 'style=\"padding:6px 10px;border:1px solid #bbb;vertical-align:top\"';\nconst box = (bg, fg, html) => '<div style=\"background:' + bg + ';color:' + fg + ';padding:10px 14px;border-radius:6px;margin:10px 0;font-weight:bold\">' + html + '</div>';\nconst h = (t) => '<h3 style=\"margin:22px 0 8px;border-bottom:2px solid #ddd;padding-bottom:4px\">' + esc(t) + '</h3>';\nconst tbl = (inner) => '<table border=\"1\" cellspacing=\"0\" style=\"border-collapse:collapse;font-family:monospace;font-size:14px\">' + inner + '</table>';\nlet html = '<div style=\"text-align:left;max-width:1000px;overflow-x:auto\">';\n\nif (!d.ok) {\n  html += box('#fed7d7', '#9b2c2c', 'ERROR: la gramática o los datos de entrada no son válidos');\n  html += '<ul>' + d.errors.map((e) => '<li>' + esc(e) + '</li>').join('') + '</ul>';\n  html += '<p>Formato esperado, una producción por línea: <code>A -> aB | b</code>. Use <code>ε</code> para la cadena vacía. Los no terminales son los símbolos que aparecen a la izquierda de \"->\". Separe los símbolos con espacios o escríbalos juntos; para terminales de varios caracteres (por ejemplo id) decláreelos en el campo correspondiente. El símbolo $ está reservado.</p>';\n  html += '</div>';\n  return [{ json: { html: html } }];\n}\n\nconst fmtSet = (arr) => '{ ' + arr.map(esc).join(', ') + ' }';\nconst prodStr = (p) => esc(p.lhs) + ' → ' + (p.rhs.length ? esc(p.rhs.join(' ')) : 'ε');\n\nhtml += h('1. Producciones (símbolo inicial: ' + d.start + ')');\nhtml += tbl('<tr><th ' + TH + '>#</th><th ' + TH + '>Producción</th></tr>' + d.prods.map((p) => '<tr><td ' + TD + '>' + p.id + '</td><td ' + TD + '>' + prodStr(p) + '</td></tr>').join(''));\nhtml += '<p>No terminales: ' + fmtSet(d.nts) + '<br>Terminales: ' + fmtSet(d.terminals.concat(['$'])) + '</p>';\nif (d.warnings && d.warnings.length) {\n  html += box('#fefcbf', '#744210', 'Advertencias') + '<ul>' + d.warnings.map((w) => '<li>' + esc(w) + '</li>').join('') + '</ul>';\n}\n\nhtml += h('2. Conjuntos FIRST');\nhtml += tbl('<tr><th ' + TH + '>No terminal</th><th ' + TH + '>FIRST</th></tr>' + d.nts.map((n) => '<tr><td ' + TD + '>' + esc(n) + '</td><td ' + TD + '>' + fmtSet(d.firstSets[n]) + '</td></tr>').join(''));\n\nhtml += h('3. Conjuntos FOLLOW');\nhtml += tbl('<tr><th ' + TH + '>No terminal</th><th ' + TH + '>FOLLOW</th></tr>' + d.nts.map((n) => '<tr><td ' + TD + '>' + esc(n) + '</td><td ' + TD + '>' + fmtSet(d.followSets[n]) + '</td></tr>').join(''));\n\nhtml += h('4. Matriz predictiva LL(1)');\nlet head = '<tr><th ' + TH + '>M</th>' + d.columns.map((c) => '<th ' + TH + '>' + esc(c) + '</th>').join('') + '</tr>';\nlet rows = d.nts.map((n) => {\n  return '<tr><td ' + TD + '><b>' + esc(n) + '</b></td>' + d.columns.map((c) => {\n    const cell = d.table[n][c];\n    if (!cell) return '<td ' + TD + '></td>';\n    const ids = Array.from(new Set(cell.map((e) => e.id)));\n    const txt = ids.map((id) => prodStr(d.prods[id])).join('<br>');\n    const bg = ids.length > 1 ? 'background:#fed7d7;' : '';\n    return '<td style=\"padding:6px 10px;border:1px solid #bbb;vertical-align:top;' + bg + '\">' + txt + '</td>';\n  }).join('') + '</tr>';\n}).join('');\nhtml += tbl(head + rows);\nif (d.isLL1) {\n  html += box('#c6f6d5', '#22543d', 'La gramática ES LL(1): no hay conflictos en la matriz predictiva.');\n} else {\n  html += box('#fed7d7', '#9b2c2c', 'La gramática NO es LL(1): se encontraron ' + d.conflicts.length + ' conflicto(s).');\n  html += '<ul>' + d.conflicts.map((c) => '<li>M[' + esc(c.nt) + ', ' + esc(c.terminal) + '] (' + c.kind + '): ' + c.prods.map((id) => prodStr(d.prods[id])).join('  |  ') + '</li>').join('') + '</ul>';\n}\n\nhtml += h('5. Análisis de la cadena');\nconst pr = d.parse;\nif (!pr.provided) {\n  html += '<p>' + esc(pr.message) + '</p>';\n} else {\n  html += '<p>Cadena: <code>' + esc(d.inputRaw) + '</code> &nbsp; Tokens: ' + fmtSet(pr.tokens.concat(['$'])) + '</p>';\n  html += pr.accepted ? box('#c6f6d5', '#22543d', esc(pr.message)) : box('#fed7d7', '#9b2c2c', esc(pr.message));\n  if (pr.notes && pr.notes.length) html += '<ul>' + pr.notes.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul>';\n  if (pr.steps.length) {\n    html += '<h4>Traza del análisis</h4>';\n    html += tbl('<tr><th ' + TH + '>Paso</th><th ' + TH + '>Pila (tope a la izquierda)</th><th ' + TH + '>Entrada</th><th ' + TH + '>Acción</th></tr>' + pr.steps.map((s) => '<tr><td ' + TD + '>' + s.n + '</td><td ' + TD + '>' + esc(s.stack) + '</td><td ' + TD + '>' + esc(s.input) + '</td><td ' + TD + '>' + esc(s.action) + '</td></tr>').join(''));\n  }\n  if (pr.treeText) {\n    html += '<h4>' + (pr.accepted ? 'Árbol de derivación' : 'Árbol parcial (hasta el punto del error)') + '</h4>';\n    html += '<pre style=\"background:#f7fafc;border:1px solid #ddd;padding:10px;font-size:15px;line-height:1.35\">' + esc(pr.treeText) + '</pre>';\n  }\n}\nhtml += '</div>';\nreturn [{ json: { html: html } }];\n"
+      },
+      "id": "e3b16f0b-25c9-4fb6-b10a-c58f8bb94f23",
+      "name": "Formatear resultados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "={{ $json.html }}"
+      },
+      "id": "159bbc66-0281-43ad-bb36-48a49ac9bb0e",
+      "name": "Mostrar resultados",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1424,
+        0
+      ],
+      "webhookId": "20c1e42e-ce61-4f01-b256-0bd05e25c1f2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ingresar gramática": {
+      "main": [
+        [
+          {
+            "node": "Validar y parsear gramática",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar y parsear gramática": {
+      "main": [
+        [
+          {
+            "node": "Calcular FIRST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular FIRST": {
+      "main": [
+        [
+          {
+            "node": "Calcular FOLLOW",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular FOLLOW": {
+      "main": [
+        [
+          {
+            "node": "Matriz predictiva LL(1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Matriz predictiva LL(1)": {
+      "main": [
+        [
+          {
+            "node": "Análisis y árbol de derivación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Análisis y árbol de derivación": {
+      "main": [
+        [
+          {
+            "node": "Formatear resultados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear resultados": {
+      "main": [
+        [
+          {
+            "node": "Mostrar resultados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7de7db1c-d9e6-4c05-a8a4-291c59373f7e",
+  "meta": {
+    "instanceId": "ca680e08f606ee94eb25cffa4b961af44f463f59ed4f50f4b18d67a637b2465e"
+  },
+  "nodeGroups": [
+    {
+      "id": "44780378-6fde-4dc9-8aab-a14196f75ca2",
+      "name": "Calcular tabla LL(1)",
+      "nodeIds": [
+        "ca4681ee-8069-4567-8f6c-0c230db6436d",
+        "d355d993-6713-4ea1-aa87-326986a94acf",
+        "98e253be-d414-42a1-b540-c1e4f7f575e2"
+      ],
+      "description": "Con la gramática validada, obtiene los conjuntos FIRST y FOLLOW y arma la matriz predictiva con sus conflictos"
+    }
+  ],
+  "id": "fQmYfCXdlLh1xb7L",
+  "tags": []
+}
